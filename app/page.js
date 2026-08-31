@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Wind, Droplet, Leaf, ArrowRight } from 'lucide-react'
+import { Wind, Droplet, Leaf, ArrowRight, Globe, Sparkles } from 'lucide-react'
 import { getDictionary, LOCALES } from '@/lib/i18n'
 
 const impactCards = [
@@ -17,52 +17,80 @@ export default function App() {
   const t = getDictionary(locale)
 
   return (
-    <main className="relative overflow-hidden pb-20">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-96 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(16,185,129,0.14),_transparent_25%)] blur-3xl" />
+    <main className="bg-image min-h-screen text-slate-900">
+      <nav className="sticky top-0 z-50 border-b border-white/60 bg-white/60 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#006a42] text-lg text-white shadow-sm shadow-emerald-600/25">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-lg font-bold tracking-tight text-slate-900">AgroVani</p>
+            </div>
+          </div>
 
-      <header className="relative mx-auto flex max-w-7xl items-center justify-between px-4 py-6 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-2 text-lg font-bold tracking-tight text-slate-900">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white">🌾</span>
-          AgroVani
-        </div>
-        <div className="flex items-center gap-1 rounded-full bg-white/70 p-1 shadow-sm backdrop-blur">
-          {LOCALES.map((l) => (
-            <button
-              key={l.code}
-              onClick={() => setLocale(l.code)}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${locale === l.code ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-            >
-              {l.label}
+          <div className="hidden items-center gap-8 md:flex">
+            <a href="#" className="text-sm font-medium text-slate-700 transition hover:text-emerald-700">Residue</a>
+            <a href="#" className="text-sm font-medium text-slate-700 transition hover:text-emerald-700">Machinery</a>
+            <a href="#" className="text-sm font-medium text-slate-700 transition hover:text-emerald-700">Crop Health</a>
+            <a href="#" className="text-sm font-medium text-slate-700 transition hover:text-emerald-700">Advisory</a>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button className="hidden rounded-full border border-white/80 bg-white/60 p-2 text-slate-700 transition hover:bg-white md:flex">
+              <Globe className="h-4 w-4" />
             </button>
-          ))}
+            <div className="flex rounded-full border border-white/80 bg-white/70 p-1 shadow-[inset_0_1px_2px_rgba(255,255,255,1),0_3px_10px_rgba(0,0,0,0.04)]">
+              {LOCALES.map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => setLocale(l.code)}
+                  className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${locale === l.code ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-700 hover:bg-white/80'}`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-      </header>
+      </nav>
 
-      <section className="relative mx-auto grid max-w-7xl gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1.25fr_0.95fr] lg:items-center lg:px-8">
-        <div className="space-y-8">
-          <div className="inline-flex items-center gap-3 rounded-full bg-slate-900/10 px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm backdrop-blur-xl">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+      <section className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.2fr_0.95fr] lg:items-center lg:px-8 lg:py-24">
+        <div className="z-10 flex flex-col gap-8">
+          <div className="inline-flex w-max items-center gap-2 rounded-full border border-white/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-[0_4px_12px_rgba(0,0,0,0.04)] backdrop-blur-md">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
             {t.heroBadge}
           </div>
-          <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-tight text-slate-950 sm:text-6xl">
-            {t.heroTitle(location)}
+
+          <h1 className="max-w-3xl text-4xl font-bold leading-[1.05] tracking-[-0.05em] text-slate-950 sm:text-6xl">
+            AgroVani for Punjab: <br />
+            clean residue, smarter <br />
+            fields, stronger <br />
+            incomes.
           </h1>
-          <p className="max-w-2xl text-lg leading-8 text-slate-700">{t.heroSubtitle}</p>
-          <div className="flex flex-col gap-4 sm:flex-row">
-            <Link href="/farmer/onboarding" className="pill-dark">
-              {t.getStarted} <ArrowRight className="ml-2 h-4 w-4" />
+
+          <p className="max-w-xl text-lg leading-8 text-slate-700">
+            An agri-intelligence platform connecting farmers, machinery providers and coordinators with precision residue insights, buyer matching, and real-time biostimulant decisions.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-4 pt-2">
+            <Link href="/login" className="pill-dark">
+              Get started <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
-            <Link href="/farmer/dashboard" className="pill-outline">Explore the demo dashboard</Link>
+            <Link href="/farmer/dashboard" className="pill-outline">
+              Explore the demo dashboard
+            </Link>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+
+          <div className="grid gap-4 pt-8 sm:grid-cols-3">
             {impactCards.map((card) => {
               const Icon = card.icon
               return (
                 <div key={card.title} className="glass-card card-3d">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900/5 text-emerald-500">
-                    <Icon className="h-6 w-6" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-emerald-600 shadow-inner">
+                    <Icon className="h-5 w-5" />
                   </div>
-                  <h2 className="mt-4 text-base font-semibold text-slate-950">{card.title}</h2>
+                  <h2 className="mt-4 text-[18px] font-semibold leading-6 text-slate-950">{card.title}</h2>
                   <p className="mt-2 text-sm leading-6 text-slate-600">{card.description}</p>
                 </div>
               )
@@ -70,28 +98,36 @@ export default function App() {
           </div>
         </div>
 
-        <div className="relative mx-auto w-full max-w-xl">
-          <div className="glass-panel relative overflow-hidden rounded-[2rem] p-4 card-3d">
-            <img
-              src="https://images.unsplash.com/photo-1602989106211-81de671c23a9?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200"
-              alt="Lush green paddy field"
-              className="h-48 w-full rounded-2xl object-cover"
-            />
-            <div className="mt-4 flex items-center justify-between rounded-2xl bg-slate-900/5 p-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">AgroVani</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-950">Live field insights</p>
-              </div>
-              <span className="badge-green">{t.farms}</span>
+        <div className="relative mt-8 lg:mt-0">
+          <div className="glass-card relative overflow-hidden p-4 md:p-6">
+            <div className="absolute -right-16 -top-16 h-52 w-52 rounded-full bg-emerald-200/40 blur-3xl" />
+            <div className="absolute -bottom-16 -left-16 h-52 w-52 rounded-full bg-sky-200/40 blur-3xl" />
+
+            <div className="relative overflow-hidden rounded-[24px] border border-white/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.08),0_12px_30px_rgba(0,0,0,0.08)]">
+              <img
+                src="https://images.unsplash.com/photo-1602989106211-81de671c23a9?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200"
+                alt="Lush green paddy field"
+                className="h-56 w-full object-cover md:h-64"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
             </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl bg-white/90 p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{t.residueForecast}</p>
-                <p className="mt-3 text-3xl font-semibold text-slate-950">3.4 t/acre</p>
+
+            <div className="relative mt-4 flex items-center justify-between rounded-2xl border border-white/80 bg-white/70 p-5 backdrop-blur-md">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-500">AgroVani</p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-900">Live field insights</h2>
               </div>
-              <div className="rounded-2xl bg-white/90 p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Night heat stress</p>
-                <p className="mt-3 text-3xl font-semibold text-emerald-600">7.1 / 9</p>
+              <span className="badge-green">50K+ farms</span>
+            </div>
+
+            <div className="relative mt-4 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-[0_6px_20px_rgba(0,0,0,0.04)] backdrop-blur-md">
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">Residue Forecast</p>
+                <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">3.4 <span className="text-lg text-slate-500">t/acre</span></p>
+              </div>
+              <div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-[0_6px_20px_rgba(0,0,0,0.04)] backdrop-blur-md">
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">Night Heat Stress</p>
+                <p className="mt-3 text-3xl font-bold tracking-tight text-emerald-600">7.1 <span className="text-lg text-slate-500">/ 9</span></p>
               </div>
             </div>
           </div>
