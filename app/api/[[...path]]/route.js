@@ -6,17 +6,118 @@ import { fetchSprayWindow, fetchHydricStress, geocodeLocation } from '@/lib/adap
 import { computeStressDiagnostic, CROP_LIST } from '@/lib/calculations/cropRecommendation'
 import { computeResidue, DISTRICT_DATA, getDistrictData } from '@/lib/calculations/residueRecommendation'
 
-// MongoDB connection
 let client
 let db
+let memoryDb = null
+
+function createMemoryCollection(initialRows = []) {
+  const rows = [...initialRows]
+
+  const makeQueryMatcher = (query = {}) => (row) => Object.entries(query).every(([key, value]) => {
+    if (value === undefined) return true
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return Object.entries(value).every(([nestedKey, nestedValue]) => {
+        const source = row[key]
+        if (source && typeof source === 'object') return source[nestedKey] === nestedValue
+        return false
+      })
+    }
+    return row[key] === value
+  })
+
+  return {
+    async countDocuments() {
+      return rows.length
+    },
+    async insertMany(items) {
+      rows.push(...items)
+      return { insertedCount: items.length }
+    },
+    async insertOne(item) {
+      rows.push(item)
+      return { insertedId: item.id || rows.length }
+    },
+    find(query = {}) {
+      const filtered = rows.filter(makeQueryMatcher(query))
+
+      let sortSpec = null
+      let limitValue = null
+
+      return {
+        sort(spec) {
+          sortSpec = spec
+          return this
+        },
+        limit(value) {
+          limitValue = value
+          return this
+        },
+        async toArray() {
+          let result = [...filtered]
+          if (sortSpec) {
+            const entries = Object.entries(sortSpec)
+            result.sort((a, b) => {
+              for (const [key, direction] of entries) {
+                const delta = (a[key] ?? 0) > (b[key] ?? 0) ? 1 : -1
+                if ((a[key] ?? 0) === (b[key] ?? 0)) continue
+                return direction === -1 ? -delta : delta
+              }
+              return 0
+            })
+          }
+          if (limitValue !== null) result = result.slice(0, limitValue)
+          return result
+        },
+      }
+    },
+    async findOne(query = {}) {
+      return rows.find(makeQueryMatcher(query)) || null
+    },
+  }
+}
+
+function createMemoryDb() {
+  const now = new Date()
+  const farms = SEED_FARMS.map((farm) => ({ id: uuidv4(), ...farm, createdAt: now }))
+  const machinery = SEED_MACHINERY.map((item) => ({ id: uuidv4(), ...item }))
+  const districtMetrics = Object.entries(DISTRICT_DATA).map(([district, values]) => ({ id: uuidv4(), district, ...values }))
+
+  const collections = {
+    farms: createMemoryCollection(farms),
+    machinery: createMemoryCollection(machinery),
+    district_metrics: createMemoryCollection(districtMetrics),
+    stress_diagnostic_logs: createMemoryCollection(),
+    bookings: createMemoryCollection(),
+  }
+
+  return {
+    collection(name) {
+      if (!collections[name]) collections[name] = createMemoryCollection()
+      return collections[name]
+    },
+  }
+}
 
 async function connectToMongo() {
-  if (!client) {
-    client = new MongoClient(process.env.MONGO_URL)
-    await client.connect()
-    db = client.db(process.env.DB_NAME)
+  if (memoryDb) return memoryDb
+
+  if (!process.env.MONGO_URL || !process.env.DB_NAME) {
+    memoryDb = createMemoryDb()
+    return memoryDb
   }
-  return db
+
+  try {
+    if (!client) {
+      client = new MongoClient(process.env.MONGO_URL)
+      await client.connect()
+      db = client.db(process.env.DB_NAME)
+    }
+    return db
+  } catch (error) {
+    console.warn('MongoDB unavailable, falling back to in-memory store for Vercel deployment:', error.message)
+    memoryDb = createMemoryDb()
+    return memoryDb
+  }
 }
 
 function handleCORS(response) {
@@ -53,13 +154,13 @@ const SEED_MACHINERY = [
 
 async function seedDb(db) {
   const farmsCol = db.collection('farms')
-  const count = await farmsCol.countDocuments()
-  if (count === 0) {
+  const farmCount = await farmsCol.countDocuments()
+  if (farmCount === 0) {
     const now = new Date()
-    const farms = SEED_FARMS.map((f) => ({ id: uuidv4(), ...f, createdAt: now }))
+    const farms = SEED_FARMS.map((farm) => ({ id: uuidv4(), ...farm, createdAt: now }))
     await farmsCol.insertMany(farms)
-    await db.collection('machinery').insertMany(SEED_MACHINERY.map((m) => ({ id: uuidv4(), ...m })))
-    const metrics = Object.entries(DISTRICT_DATA).map(([district, d]) => ({ id: uuidv4(), district, ...d }))
+    await db.collection('machinery').insertMany(SEED_MACHINERY.map((item) => ({ id: uuidv4(), ...item })))
+    const metrics = Object.entries(DISTRICT_DATA).map(([district, values]) => ({ id: uuidv4(), district, ...values }))
     await db.collection('district_metrics').insertMany(metrics)
     return { seeded: true, farms: farms.length }
   }
@@ -79,13 +180,11 @@ async function handleRoute(request, { params }) {
       return ok({ message: 'AgroVani API', crops: CROP_LIST })
     }
 
-    // Seed database with demo farms/machinery/metrics
     if (route === '/seed' && method === 'POST') {
       const result = await seedDb(db)
       return ok(result)
     }
 
-    // Geocoding for onboarding (Nominatim fallback for CE Hub LocationSearch)
     if (route === '/geocode' && method === 'GET') {
       const query = searchParams.get('query') || ''
       if (!query) return ok({ results: [] })
@@ -93,7 +192,6 @@ async function handleRoute(request, { params }) {
       return ok({ results })
     }
 
-    // Farms CRUD
     if (route === '/farms' && method === 'POST') {
       const body = await request.json()
       const farm = {
@@ -125,18 +223,21 @@ async function handleRoute(request, { params }) {
         return ok(clean)
       }
       const farms = await db.collection('farms').find({}).limit(100).toArray()
-      return ok(farms.map(({ _id, ...r }) => r))
+      return ok(farms.map(({ _id, ...rest }) => rest))
     }
 
-    // Stress diagnostic (core engine) â€” Meteoblue + cardinal temps + spray window
     if (route === '/stress' && method === 'GET') {
       const farmId = searchParams.get('farmId')
       let lat, lon, crop, area, soilPh, nitrogen
       if (farmId) {
         const farm = await db.collection('farms').findOne({ id: farmId })
         if (!farm) return ok({ error: 'Farm not found' }, 404)
-        lat = farm.latitude; lon = farm.longitude; crop = farm.cropType
-        area = farm.areaInAcres; soilPh = farm.soilPh; nitrogen = farm.nitrogenKgPerHa
+        lat = farm.latitude
+        lon = farm.longitude
+        crop = farm.cropType
+        area = farm.areaInAcres
+        soilPh = farm.soilPh
+        nitrogen = farm.nitrogenKgPerHa
       } else {
         lat = Number(searchParams.get('lat'))
         lon = Number(searchParams.get('lon'))
@@ -177,14 +278,14 @@ async function handleRoute(request, { params }) {
       })
     }
 
-    // Residue economics (Tab 1)
     if (route === '/residue' && method === 'GET') {
       const farmId = searchParams.get('farmId')
       let area, district
       if (farmId) {
         const farm = await db.collection('farms').findOne({ id: farmId })
         if (!farm) return ok({ error: 'Farm not found' }, 404)
-        area = farm.areaInAcres; district = farm.district
+        area = farm.areaInAcres
+        district = farm.district
       } else {
         area = Number(searchParams.get('area')) || 5
         district = searchParams.get('district') || 'Patiala'
@@ -193,18 +294,16 @@ async function handleRoute(request, { params }) {
       return ok(result)
     }
 
-    // Machinery listing
     if (route === '/machinery' && method === 'GET') {
       const district = searchParams.get('district')
       const type = searchParams.get('type')
-      const q = {}
-      if (district) q.district = district
-      if (type) q.type = type
-      const items = await db.collection('machinery').find(q).limit(100).toArray()
-      return ok(items.map(({ _id, ...r }) => r))
+      const query = {}
+      if (district) query.district = district
+      if (type) query.type = type
+      const items = await db.collection('machinery').find(query).limit(100).toArray()
+      return ok(items.map(({ _id, ...rest }) => rest))
     }
 
-    // Bookings
     if (route === '/bookings' && method === 'POST') {
       const body = await request.json()
       const booking = {
@@ -226,16 +325,15 @@ async function handleRoute(request, { params }) {
 
     if (route === '/bookings' && method === 'GET') {
       const farmId = searchParams.get('farmId')
-      const q = farmId ? { farmId } : {}
-      const items = await db.collection('bookings').find(q).sort({ createdAt: -1 }).limit(100).toArray()
-      return ok(items.map(({ _id, ...r }) => r))
+      const query = farmId ? { farmId } : {}
+      const items = await db.collection('bookings').find(query).sort({ createdAt: -1 }).limit(100).toArray()
+      return ok(items.map(({ _id, ...rest }) => rest))
     }
 
-    // District metrics
     if (route === '/district-metrics' && method === 'GET') {
       const district = searchParams.get('district')
       if (district) return ok({ district, ...getDistrictData(district) })
-      return ok(Object.entries(DISTRICT_DATA).map(([d, v]) => ({ district: d, ...v })))
+      return ok(Object.entries(DISTRICT_DATA).map(([districtName, values]) => ({ district: districtName, ...values })))
     }
 
     return ok({ error: `Route ${route} not found` }, 404)
