@@ -181,6 +181,46 @@ async function seedDb(db) {
   return { seeded: false }
 }
 
+async function createAssistantReply(db, body) {
+  if (!process.env.GEMINI_API_KEY) return ok({ error: 'Gemini voice assistant is not configured' }, 503)
+
+  const farm = body.farmId ? await db.collection('farms').findOne({ id: body.farmId }) : null
+  if (body.farmId && !farm) return ok({ error: 'Farm not found' }, 404)
+
+  const farmContext = farm
+    ? `Farmer: ${farm.name}. Location: ${farm.village}, ${farm.district}, ${farm.state}. Crop: ${farm.cropType}. Area: ${farm.areaInAcres} acres. Soil pH: ${farm.soilPh ?? 'unknown'}. Nitrogen: ${farm.nitrogenKgPerHa ?? 'unknown'} kg/ha.`
+    : 'No farm profile is available yet.'
+  const liveContext = body.context ? `Current dashboard data (may be stale): ${JSON.stringify(body.context)}` : ''
+  const language = body.locale === 'hi' ? 'Hindi' : body.locale === 'pa' ? 'Punjabi' : 'English'
+  const systemInstruction = [
+    'You are AgroVani, a concise and practical agricultural voice advisor for Indian farmers.',
+    `Speak in ${language}. If the farmer speaks another supported Indian language, follow their language.`,
+    'Use simple words, short sentences, and quantities with units. Ask one clarifying question when essential.',
+    'Never invent weather, disease diagnoses, pesticide doses, or prices. Recommend consulting a local agronomist for high-risk chemical or medical questions.',
+    farmContext,
+    liveContext,
+  ].join('\n')
+  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      contents: [{ role: 'user', parts: [{ text: body.message || '' }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: 300 },
+    }),
+  })
+
+  const data = await response.json()
+  if (!response.ok) {
+    console.error('Gemini assistant error:', data)
+    return ok({ error: 'Unable to get an assistant response' }, 502)
+  }
+  const reply = data.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim()
+  return reply ? ok({ reply }) : ok({ error: 'Assistant returned an empty response' }, 502)
+}
+
 async function handleRoute(request, { params }) {
   const { path = [] } = await params
   const route = `/${path.join('/')}`
@@ -189,6 +229,10 @@ async function handleRoute(request, { params }) {
 
   try {
     const db = await connectToDatabase()
+
+    if (route === '/assistant' && method === 'POST') {
+      return createAssistantReply(db, await request.json())
+    }
 
     if ((route === '/' || route === '/root') && method === 'GET') {
       return ok({ message: 'AgroVani API', crops: CROP_LIST })
