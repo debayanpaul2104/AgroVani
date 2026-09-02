@@ -108,13 +108,15 @@ async function connectToMongo() {
 
   try {
     if (!client) {
-      client = new MongoClient(process.env.MONGO_URL)
+      client = new MongoClient(process.env.MONGO_URL, { serverSelectionTimeoutMS: 3000, connectTimeoutMS: 3000 })
       await client.connect()
       db = client.db(process.env.DB_NAME)
     }
-    return db
+    if (db) return db
+    throw new Error('MongoDB connection did not return a database')
   } catch (error) {
     console.warn('MongoDB unavailable, falling back to in-memory store for Vercel deployment:', error.message)
+    client = null
     memoryDb = createMemoryDb()
     return memoryDb
   }

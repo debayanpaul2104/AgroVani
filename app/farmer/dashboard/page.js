@@ -54,8 +54,36 @@ export default function App() {
   const [stress, setStress] = useState(null)
   const [residue, setResidue] = useState(null)
   const [loading, setLoading] = useState(false)
-  const { t } = useLanguage()
+  const [voiceText, setVoiceText] = useState('')
+  const [voiceReply, setVoiceReply] = useState('')
+  const [listening, setListening] = useState(false)
+  const [cameraFile, setCameraFile] = useState(null)
+  const { locale, t } = useLanguage()
   const copy = t.dashboard
+
+  function startVoice() {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!Recognition) {
+      setVoiceText('Voice recognition is not supported in this browser.')
+      return
+    }
+    const recognition = new Recognition()
+    recognition.lang = locale === 'hi' ? 'hi-IN' : locale === 'pa' ? 'pa-IN' : 'en-IN'
+    recognition.interimResults = false
+    recognition.onstart = () => setListening(true)
+    recognition.onend = () => setListening(false)
+    recognition.onerror = () => { setListening(false); setVoiceText('Could not hear that. Please try again.') }
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript
+      const reply = transcript.toLowerCase().includes('water') || transcript.includes('पानी') || transcript.includes('ਪਾਣੀ')
+        ? 'Check soil moisture before irrigation. Water early morning when possible.'
+        : 'Your question was captured. Review the live crop health and spray window guidance below.'
+      setVoiceText(transcript)
+      setVoiceReply(reply)
+      if ('speechSynthesis' in window) window.speechSynthesis.speak(new SpeechSynthesisUtterance(reply))
+    }
+    recognition.start()
+  }
 
   useEffect(() => {
     const p = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
@@ -255,15 +283,16 @@ export default function App() {
                 <div className="glass-card">
                   <div className="flex items-center gap-2 text-slate-900"><Mic className="h-5 w-5 text-emerald-600" /><h3 className="text-xl font-semibold">Voice Advisory</h3></div>
                   <p className="mt-2 text-sm text-slate-600">Ask in Punjabi, Hindi, Marathi, Tamil or Telugu. Speech-to-Text advisory.</p>
-                  <button className="mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 shadow-sm"><Mic className="h-6 w-6" /></button>
-                  <p className="mt-3 text-xs text-slate-400">AI voice model connects on enablement.</p>
+                  <button onClick={startVoice} aria-label="Start voice advisory" className={`mt-5 flex h-14 w-14 items-center justify-center rounded-full shadow-sm ${listening ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}><Mic className="h-6 w-6" /></button>
+                  <p className="mt-3 text-xs text-slate-500">{voiceText || (listening ? 'Listening...' : 'Tap the microphone and ask your question.')}</p>
+                  {voiceReply && <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{voiceReply}</p>}
                 </div>
 
                 <div className="glass-card">
                   <div className="flex items-center gap-2 text-slate-900"><Camera className="h-5 w-5 text-emerald-600" /><h3 className="text-xl font-semibold">Crop Cam Diagnostic</h3></div>
                   <p className="mt-2 text-sm text-slate-600">Snap a leaf to detect chlorosis, heat wilting & fungal lesions with Gemini Vision.</p>
-                  <div className="mt-5 flex h-24 items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/50 text-sm font-medium text-slate-400">Upload leaf image</div>
-                  <p className="mt-3 text-xs text-slate-400">AI vision model connects on enablement.</p>
+                  <label className="mt-5 flex h-24 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-200 bg-white/50 text-sm font-medium text-slate-500 hover:bg-white/80">{cameraFile ? <img src={URL.createObjectURL(cameraFile)} alt="Captured crop leaf" className="h-full w-full object-cover" /> : 'Upload leaf image'}<input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(event) => setCameraFile(event.target.files?.[0] || null)} /></label>
+                  <p className="mt-3 text-xs text-slate-500">{cameraFile ? 'Leaf image ready for diagnosis.' : 'Choose a leaf photo to prepare a crop diagnosis.'}</p>
                 </div>
               </div>
 

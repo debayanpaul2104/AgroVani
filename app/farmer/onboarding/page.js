@@ -29,6 +29,7 @@ export default function App() {
   const [geoLoading, setGeoLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
     try {
@@ -67,6 +68,7 @@ export default function App() {
 
   async function finish() {
     setSubmitting(true)
+    setSubmitError('')
     try {
       const res = await fetch('/api/farms', {
         method: 'POST',
@@ -74,9 +76,12 @@ export default function App() {
         body: JSON.stringify(form),
       })
       const data = await res.json()
+      if (!res.ok || !data.id) throw new Error(data.detail || data.error || 'Unable to save your farm')
       localStorage.setItem('fv_farmId', data.id)
       localStorage.setItem('fv_onboarding', JSON.stringify(form))
       router.push('/farmer/dashboard')
+    } catch (error) {
+      setSubmitError(error.message || 'Unable to save your farm. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -205,6 +210,7 @@ export default function App() {
                 </button>
               )}
             </div>
+            {submitError && <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{submitError}</p>}
           </div>
 
           <div className="space-y-5">
