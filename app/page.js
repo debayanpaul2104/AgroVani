@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { Wind, Droplet, Leaf, ArrowRight, Globe, Sparkles } from 'lucide-react'
-import { getDictionary, LOCALES } from '@/lib/i18n'
+import { Wind, Droplet, Leaf, ArrowRight, Sparkles } from 'lucide-react'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 const impactCards = [
   { title: 'Reduce stubble burning', description: 'Protect air quality with residue alternatives and local machinery support.', icon: Wind },
@@ -12,45 +12,31 @@ const impactCards = [
 ]
 
 export default function App() {
-  const [locale, setLocale] = useState('en')
-  const [location] = useState('Punjab')
-  const t = getDictionary(locale)
+  const { t } = useLanguage()
+  const location = 'Punjab'
 
   return (
-    <main className="bg-image min-h-screen text-slate-900">
-      <nav className="sticky top-0 z-50 border-b border-white/60 bg-white/60 backdrop-blur-xl">
+    <main className="page-home bg-image min-h-screen text-white">
+      <nav className="sticky top-0 z-50 border-b border-white/20 bg-slate-950/35 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#006a42] text-lg text-white shadow-sm shadow-emerald-600/25">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-lg text-white shadow-sm shadow-emerald-600/25">
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-lg font-bold tracking-tight text-slate-900">AgroVani</p>
+              <p className="text-lg font-bold tracking-tight text-white">{t.brand}</p>
             </div>
           </div>
 
           <div className="hidden items-center gap-8 md:flex">
-            <a href="#" className="text-sm font-medium text-slate-700 transition hover:text-emerald-700">Residue</a>
-            <a href="#" className="text-sm font-medium text-slate-700 transition hover:text-emerald-700">Machinery</a>
-            <a href="#" className="text-sm font-medium text-slate-700 transition hover:text-emerald-700">Crop Health</a>
-            <a href="#" className="text-sm font-medium text-slate-700 transition hover:text-emerald-700">Advisory</a>
+            <a href="#" className="text-sm font-medium text-slate-200 transition hover:text-white">{t.nav.residue}</a>
+            <a href="#" className="text-sm font-medium text-slate-200 transition hover:text-white">{t.nav.machinery}</a>
+            <a href="#" className="text-sm font-medium text-slate-200 transition hover:text-white">{t.nav.crop}</a>
+            <a href="#" className="text-sm font-medium text-slate-200 transition hover:text-white">{t.nav.advisory}</a>
           </div>
 
           <div className="flex items-center gap-3">
-            <button className="hidden rounded-full border border-white/80 bg-white/60 p-2 text-slate-700 transition hover:bg-white md:flex">
-              <Globe className="h-4 w-4" />
-            </button>
-            <div className="flex rounded-full border border-white/80 bg-white/70 p-1 shadow-[inset_0_1px_2px_rgba(255,255,255,1),0_3px_10px_rgba(0,0,0,0.04)]">
-              {LOCALES.map((l) => (
-                <button
-                  key={l.code}
-                  onClick={() => setLocale(l.code)}
-                  className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${locale === l.code ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-700 hover:bg-white/80'}`}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
+            <LanguageSwitcher />
           </div>
         </div>
       </nav>
@@ -63,14 +49,11 @@ export default function App() {
           </div>
 
           <h1 className="max-w-3xl text-4xl font-bold leading-[1.05] tracking-[-0.05em] text-slate-950 sm:text-6xl">
-            AgroVani for Punjab: <br />
-            clean residue, smarter <br />
-            fields, stronger <br />
-            incomes.
+            {t.heroTitle(location)}
           </h1>
 
           <p className="max-w-xl text-lg leading-8 text-slate-700">
-            An agri-intelligence platform connecting farmers, machinery providers and coordinators with precision residue insights, buyer matching, and real-time biostimulant decisions.
+            {t.heroSubtitle}
           </p>
 
           <div className="flex flex-wrap items-center gap-4 pt-2">
