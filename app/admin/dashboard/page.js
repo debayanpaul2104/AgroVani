@@ -2,16 +2,18 @@
 
 import Link from 'next/link'
 import { ArrowLeft, BarChart3, ShieldCheck, Users } from 'lucide-react'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 export default function AdminDashboard() {
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.12),_transparent_18%),linear-gradient(180deg,#f8fbff_0%,#eff6ff_100%)] p-4 text-slate-800 md:p-8">
+    <main className="page-admin min-h-screen p-4 text-slate-800 md:p-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex items-center justify-between rounded-[24px] border border-white/80 bg-white/70 p-4 backdrop-blur-md">
           <Link href="/login" className="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
             <ArrowLeft className="h-4 w-4" /> AgroVani Admin Portal
           </Link>
           <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-blue-700">Admin</span>
+          <LanguageSwitcher />
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">

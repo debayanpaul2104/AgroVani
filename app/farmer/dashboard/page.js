@@ -5,6 +5,8 @@ import React from 'react'
 import Link from 'next/link'
 import FarmMapCard from '@/components/farmer/FarmMapCard'
 import BookMachineryCard from '@/components/farmer/BookMachineryCard'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 import {
   Wheat, FlaskConical, ArrowLeft, TrendingUp, Sun, Moon, Snowflake,
   Droplets, Sparkles, Clock, Mic, Camera, IndianRupee, AlertTriangle, Loader2,
@@ -52,6 +54,8 @@ export default function App() {
   const [stress, setStress] = useState(null)
   const [residue, setResidue] = useState(null)
   const [loading, setLoading] = useState(false)
+  const { t } = useLanguage()
+  const copy = t.dashboard
 
   useEffect(() => {
     const p = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
@@ -99,25 +103,26 @@ export default function App() {
 
   return (
     <DebugBoundary>
-      <main className="bg-image min-h-screen p-4 md:p-8">
+      <main className="page-farmer min-h-screen p-4 md:p-8">
         <div className="mx-auto max-w-7xl">
           <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900">
               <ArrowLeft className="h-4 w-4" /> AgroVani
             </Link>
+            <LanguageSwitcher />
 
             <div className="flex flex-col gap-3 md:flex-row md:items-center">
               <div className="inline-flex rounded-full border border-white/80 bg-white/70 p-1 shadow-[0_8px_20px_rgba(0,0,0,0.05)] backdrop-blur-md">
-                <button onClick={() => setTab('residue')} className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition ${tab === 'residue' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'}`}>
-                  <Wheat className="h-4 w-4" /> Residue & Stubble Management
+                  <button onClick={() => setTab('residue')} className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition ${tab === 'residue' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'}`}>
+                  <Wheat className="h-4 w-4" /> {copy.residueTab}
                 </button>
                 <button onClick={() => setTab('crop')} className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition ${tab === 'crop' ? 'bg-[#006a42] text-white shadow-md shadow-emerald-600/20' : 'text-slate-600 hover:text-slate-900'}`}>
-                  <FlaskConical className="h-4 w-4" /> Biostimulant & Crop Health
+                  <FlaskConical className="h-4 w-4" /> {copy.cropTab}
                 </button>
               </div>
 
               <div className="flex items-center gap-3 rounded-full border border-white/80 bg-white/70 px-4 py-2 shadow-[0_8px_20px_rgba(0,0,0,0.04)] backdrop-blur-md">
-                <span className="text-sm font-medium text-slate-600">Farm:</span>
+                <span className="text-sm font-medium text-slate-600">{copy.farm}:</span>
                 <select
                   className="bg-transparent text-sm font-semibold text-slate-900 focus:outline-none"
                   value={farm?.id || ''}
@@ -140,20 +145,20 @@ export default function App() {
           {tab === 'residue' && (
             <div className="grid gap-6 lg:grid-cols-3">
               <div className="glass-card card-3d">
-                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">Residue forecast</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">{copy.residueForecast}</p>
                 <p className="mt-4 text-5xl font-bold tracking-tight text-slate-900">{residue ? (residue.residueTons / (farm?.areaInAcres || 1)).toFixed(1) : '—'} <span className="text-lg font-medium text-slate-500">t/acre</span></p>
                 <p className="mt-3 text-sm text-slate-600">{residue?.residueTons ?? '—'} tons total across {farm?.areaInAcres ?? '—'} acres</p>
               </div>
 
               <div className="glass-card card-3d">
-                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">Buyer demand</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">{copy.buyerDemand}</p>
                 <p className="mt-4 text-5xl font-bold tracking-tight text-emerald-600">{residue?.buyerDemand || '—'}</p>
                 <p className="mt-3 flex items-center gap-1 text-sm text-slate-600"><IndianRupee className="h-4 w-4" /> {residue?.totalValueINR?.toLocaleString('en-IN') ?? '—'} potential value</p>
                 <BookMachineryCard farm={farm} defaultType="Baler" triggerLabel="Sell Stubble" triggerClass="pill-dark mt-4 w-full" />
               </div>
 
               <div className="glass-card card-3d">
-                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">Machinery readiness</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">{copy.machineryReadiness}</p>
                 <p className="mt-4 text-5xl font-bold tracking-tight text-slate-900">{residue?.machineryReadiness ?? '—'}<span className="text-2xl font-medium text-slate-500">%</span></p>
                 <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
                   <AlertTriangle className={`h-4 w-4 ${residue?.riskLevel === 'High' ? 'text-red-500' : 'text-amber-500'}`} />

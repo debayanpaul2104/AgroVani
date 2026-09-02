@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, BadgeCheck, Building2, ShieldCheck, UserRound, Lock, Mail, MapPin, ChevronRight, CheckCircle2 } from 'lucide-react'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 const roles = [
   {
@@ -12,7 +13,7 @@ const roles = [
     accent: 'emerald',
     username: 'farmer@agrovani.in',
     password: 'AgroVani@123',
-    redirect: '/farmer/dashboard',
+    redirect: '/farmer/onboarding',
     badge: 'Crop & field access',
   },
   {
@@ -104,9 +105,10 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.12),_transparent_20%),linear-gradient(180deg,#f8fafc_0%,#edf8f3_100%)] text-slate-800">
+    <main className="page-onboarding min-h-screen text-slate-800">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="overflow-hidden rounded-[28px] border border-white/70 bg-white/75 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur-xl">
+        <div className="overflow-hidden rounded-[28px] border border-white/25 bg-white/20 shadow-[0_30px_80px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+          <div className="flex justify-end px-6 pt-4 lg:px-10"><LanguageSwitcher /></div>
           <div className="h-2 w-full bg-gradient-to-r from-[#ff9933] via-[#ffffff] to-[#138808]" />
 
           <div className="flex flex-col gap-0 lg:flex-row">

@@ -2,16 +2,18 @@
 
 import Link from 'next/link'
 import { ArrowLeft, Store, TrendingUp, PackageCheck } from 'lucide-react'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 export default function SellerDashboard() {
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,191,36,0.12),_transparent_18%),linear-gradient(180deg,#fffaf3_0%,#fff7ed_100%)] p-4 text-slate-800 md:p-8">
+    <main className="page-seller min-h-screen p-4 text-slate-800 md:p-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex items-center justify-between rounded-[24px] border border-white/80 bg-white/70 p-4 backdrop-blur-md">
           <Link href="/login" className="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
             <ArrowLeft className="h-4 w-4" /> AgroVani Seller Portal
           </Link>
           <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-amber-700">Seller</span>
+          <LanguageSwitcher />
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">
