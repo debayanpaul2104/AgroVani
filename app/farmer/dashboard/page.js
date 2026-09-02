@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import React from 'react'
 import Link from 'next/link'
 import FarmMapCard from '@/components/farmer/FarmMapCard'
@@ -57,33 +57,65 @@ export default function App() {
   const [voiceText, setVoiceText] = useState('')
   const [voiceReply, setVoiceReply] = useState('')
   const [listening, setListening] = useState(false)
+  const [voiceMode, setVoiceMode] = useState('idle')
   const [cameraFile, setCameraFile] = useState(null)
+  const recognitionRef = useRef(null)
   const { locale, t } = useLanguage()
   const copy = t.dashboard
+
+  function stopVoice() {
+    recognitionRef.current?.stop()
+    recognitionRef.current = null
+    setListening(false)
+    setVoiceMode('idle')
+  }
 
   function startVoice() {
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!Recognition) {
-      setVoiceText('Voice recognition is not supported in this browser.')
+      setVoiceText('Voice input is not supported in this browser.')
       return
     }
     const recognition = new Recognition()
     recognition.lang = locale === 'hi' ? 'hi-IN' : locale === 'pa' ? 'pa-IN' : 'en-IN'
     recognition.interimResults = false
+    recognition.continuous = false
     recognition.onstart = () => setListening(true)
-    recognition.onend = () => setListening(false)
-    recognition.onerror = () => { setListening(false); setVoiceText('Could not hear that. Please try again.') }
-    recognition.onresult = (event) => {
+    recognition.onend = () => { setListening(false); recognitionRef.current = null }
+    recognition.onerror = () => { setListening(false); setVoiceMode('idle'); setVoiceText('Could not hear that. Please try again.') }
+    recognition.onresult = async (event) => {
       const transcript = event.results[0][0].transcript
-      const reply = transcript.toLowerCase().includes('water') || transcript.includes('पानी') || transcript.includes('ਪਾਣੀ')
-        ? 'Check soil moisture before irrigation. Water early morning when possible.'
-        : 'Your question was captured. Review the live crop health and spray window guidance below.'
       setVoiceText(transcript)
-      setVoiceReply(reply)
-      if ('speechSynthesis' in window) window.speechSynthesis.speak(new SpeechSynthesisUtterance(reply))
+      setVoiceMode('thinking')
+      try {
+        const response = await fetch('/api/assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            farmId: farm?.id,
+            locale,
+            message: transcript,
+            context: { weather: stress?.weather, diagnostic: stress?.diagnostic, residue },
+          }),
+        })
+        const data = await response.json()
+        if (!response.ok || !data.reply) throw new Error(data.error || 'Assistant unavailable')
+        setVoiceReply(data.reply)
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel()
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance(data.reply))
+        }
+      } catch (error) {
+        setVoiceReply(error.message || 'Assistant unavailable.')
+      } finally {
+        setVoiceMode('idle')
+      }
     }
+    recognitionRef.current = recognition
     recognition.start()
   }
+
+  useEffect(() => () => stopVoice(), [])
 
   useEffect(() => {
     const p = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
@@ -283,8 +315,8 @@ export default function App() {
                 <div className="glass-card">
                   <div className="flex items-center gap-2 text-slate-900"><Mic className="h-5 w-5 text-emerald-600" /><h3 className="text-xl font-semibold">Voice Advisory</h3></div>
                   <p className="mt-2 text-sm text-slate-600">Ask in Punjabi, Hindi, Marathi, Tamil or Telugu. Speech-to-Text advisory.</p>
-                  <button onClick={startVoice} aria-label="Start voice advisory" className={`mt-5 flex h-14 w-14 items-center justify-center rounded-full shadow-sm ${listening ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}><Mic className="h-6 w-6" /></button>
-                  <p className="mt-3 text-xs text-slate-500">{voiceText || (listening ? 'Listening...' : 'Tap the microphone and ask your question.')}</p>
+                  <button onClick={startVoice} aria-label={listening ? 'Stop voice advisory' : 'Start voice advisory'} aria-pressed={listening} className={`mt-5 flex h-14 w-14 items-center justify-center rounded-full shadow-sm ${listening ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}><Mic className="h-6 w-6" /></button>
+                  <p className="mt-3 text-xs text-slate-500">{voiceText || (voiceMode === 'connecting' ? 'Connecting...' : listening ? 'Listening...' : 'Tap the microphone and ask your question.')}</p>
                   {voiceReply && <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{voiceReply}</p>}
                 </div>
 
