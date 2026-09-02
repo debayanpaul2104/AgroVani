@@ -25,6 +25,16 @@ create table if not exists public.machinery (
   lon double precision
 );
 
+create table if not exists public.district_metrics (
+  id uuid primary key default gen_random_uuid(),
+  district text not null unique,
+  rate numeric not null default 0,
+  buyer_demand text not null default 'Medium',
+  machinery_readiness numeric not null default 0,
+  hotspots numeric not null default 0,
+  state text not null default 'India'
+);
+
 create table if not exists public.bookings (
   id uuid primary key default gen_random_uuid(),
   farm_id uuid references public.farms(id) on delete set null,
@@ -54,5 +64,6 @@ create table if not exists public.stress_diagnostic_logs (
 
 alter table public.farms enable row level security;
 alter table public.machinery enable row level security;
+alter table public.district_metrics enable row level security;
 alter table public.bookings enable row level security;
 alter table public.stress_diagnostic_logs enable row level security;
