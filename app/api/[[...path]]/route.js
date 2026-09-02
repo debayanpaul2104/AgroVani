@@ -5,10 +5,12 @@ import { fetchWeather } from '@/lib/adapters/weather'
 import { fetchSprayWindow, fetchHydricStress, geocodeLocation } from '@/lib/adapters/cehub'
 import { computeStressDiagnostic, CROP_LIST } from '@/lib/calculations/cropRecommendation'
 import { computeResidue, DISTRICT_DATA, getDistrictData } from '@/lib/calculations/residueRecommendation'
+import { createSupabaseDb, getSupabaseServerClient } from '@/lib/supabase/server'
 
 let client
 let db
 let memoryDb = null
+let supabaseDb = null
 
 function createMemoryCollection(initialRows = []) {
   const rows = [...initialRows]
@@ -122,6 +124,16 @@ async function connectToMongo() {
   }
 }
 
+function connectToDatabase() {
+  if (supabaseDb) return supabaseDb
+  const supabase = getSupabaseServerClient()
+  if (supabase) {
+    supabaseDb = createSupabaseDb(supabase)
+    return supabaseDb
+  }
+  return connectToMongo()
+}
+
 function handleCORS(response) {
   response.headers.set('Access-Control-Allow-Origin', process.env.CORS_ORIGINS || '*')
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
@@ -176,7 +188,7 @@ async function handleRoute(request, { params }) {
   const { searchParams } = new URL(request.url)
 
   try {
-    const db = await connectToMongo()
+    const db = await connectToDatabase()
 
     if ((route === '/' || route === '/root') && method === 'GET') {
       return ok({ message: 'AgroVani API', crops: CROP_LIST })
