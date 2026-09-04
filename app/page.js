@@ -13,7 +13,7 @@ const impactCards = [
 
 export default function App() {
   const { t } = useLanguage()
-  const location = 'Punjab'
+  const location = 'India'
 
   return (
     <main className="page-home bg-image min-h-screen text-white">
@@ -88,8 +88,8 @@ export default function App() {
 
             <div className="relative overflow-hidden rounded-[24px] border border-white/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.08),0_12px_30px_rgba(0,0,0,0.08)]">
               <img
-                src="https://images.unsplash.com/photo-1602989106211-81de671c23a9?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200"
-                alt="Lush green paddy field"
+                src="https://images.unsplash.com/photo-1560493676-04071c5f467b?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YWdyaWN1bHR1cmV8ZW58MHx8MHx8fDA%3D"
+                alt="Rows of green crops at sunset"
                 className="h-56 w-full object-cover md:h-64"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />

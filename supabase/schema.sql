@@ -62,8 +62,44 @@ create table if not exists public.stress_diagnostic_logs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.marketplace_listings (
+  id uuid primary key default gen_random_uuid(),
+  seller_id text not null,
+  name text not null,
+  category text not null,
+  price_inr numeric not null check (price_inr > 0),
+  stock_units integer not null default 0 check (stock_units >= 0),
+  status text not null default 'active',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.marketplace_orders (
+  id uuid primary key default gen_random_uuid(),
+  listing_id uuid references public.marketplace_listings(id) on delete set null,
+  farm_id uuid references public.farms(id) on delete set null,
+  seller_id text not null,
+  quantity integer not null default 1 check (quantity > 0),
+  total_inr numeric not null default 0,
+  status text not null default 'new',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.admin_reviews (
+  id uuid primary key default gen_random_uuid(),
+  farm_id uuid references public.farms(id) on delete cascade,
+  review_type text not null,
+  status text not null default 'open',
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);
+
 alter table public.farms enable row level security;
 alter table public.machinery enable row level security;
 alter table public.district_metrics enable row level security;
 alter table public.bookings enable row level security;
 alter table public.stress_diagnostic_logs enable row level security;
+alter table public.marketplace_listings enable row level security;
+alter table public.marketplace_orders enable row level security;
+alter table public.admin_reviews enable row level security;

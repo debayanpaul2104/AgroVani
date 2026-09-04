@@ -39,6 +39,12 @@ function createMemoryCollection(initialRows = []) {
       rows.push(item)
       return { insertedId: item.id || rows.length }
     },
+    async updateOne(query, update) {
+      const row = rows.find(makeQueryMatcher(query))
+      if (!row) return { matchedCount: 0, modifiedCount: 0 }
+      Object.assign(row, update.$set || update)
+      return { matchedCount: 1, modifiedCount: 1 }
+    },
     find(query = {}) {
       const filtered = rows.filter(makeQueryMatcher(query))
 
@@ -79,17 +85,15 @@ function createMemoryCollection(initialRows = []) {
 }
 
 function createMemoryDb() {
-  const now = new Date()
-  const farms = SEED_FARMS.map((farm) => ({ id: uuidv4(), ...farm, createdAt: now }))
-  const machinery = SEED_MACHINERY.map((item) => ({ id: uuidv4(), ...item }))
-  const districtMetrics = Object.entries(DISTRICT_DATA).map(([district, values]) => ({ id: uuidv4(), district, ...values }))
-
   const collections = {
-    farms: createMemoryCollection(farms),
-    machinery: createMemoryCollection(machinery),
-    district_metrics: createMemoryCollection(districtMetrics),
+    farms: createMemoryCollection(),
+    machinery: createMemoryCollection(),
+    district_metrics: createMemoryCollection(),
     stress_diagnostic_logs: createMemoryCollection(),
     bookings: createMemoryCollection(),
+    marketplace_listings: createMemoryCollection(),
+    marketplace_orders: createMemoryCollection(),
+    admin_reviews: createMemoryCollection(),
   }
 
   return {
@@ -215,7 +219,10 @@ async function createAssistantReply(db, body) {
   const data = await response.json()
   if (!response.ok) {
     console.error('Gemini assistant error:', data)
-    return ok({ error: 'Unable to get an assistant response' }, 502)
+    if (response.status === 401 || response.status === 403) {
+      return ok({ error: 'Voice assistant authentication failed. Add a valid GEMINI_API_KEY in .env and restart the server.' }, 502)
+    }
+    return ok({ error: 'Unable to get an assistant response. Please try again.' }, 502)
   }
   const reply = data.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim()
   return reply ? ok({ reply }) : ok({ error: 'Assistant returned an empty response' }, 502)
@@ -256,12 +263,12 @@ async function handleRoute(request, { params }) {
         id: uuidv4(),
         name: body.name || 'Farmer',
         village: body.village || '',
-        district: body.district || 'Patiala',
+        district: body.district || 'India',
         state: body.state || '',
         cropType: body.cropType || 'Rice',
         areaInAcres: Number(body.areaInAcres) || 1,
-        latitude: Number(body.latitude) || 30.3398,
-        longitude: Number(body.longitude) || 76.3869,
+        latitude: Number(body.latitude) || 20.5937,
+        longitude: Number(body.longitude) || 78.9629,
         soilPh: body.soilPh != null ? Number(body.soilPh) : null,
         nitrogenKgPerHa: body.nitrogenKgPerHa != null ? Number(body.nitrogenKgPerHa) : null,
         locale: body.locale || 'en',
@@ -282,6 +289,93 @@ async function handleRoute(request, { params }) {
       }
       const farms = await db.collection('farms').find({}).limit(100).toArray()
       return ok(farms.map(({ _id, ...rest }) => rest))
+    }
+
+    if (route === '/marketplace/listings' && method === 'GET') {
+      const sellerId = searchParams.get('sellerId')
+      const query = sellerId ? { sellerId } : {}
+      const listings = await db.collection('marketplace_listings').find(query).sort({ createdAt: -1 }).limit(200).toArray()
+      return ok(listings.map(({ _id, ...rest }) => rest))
+    }
+
+    if (route === '/marketplace/listings' && method === 'POST') {
+      const body = await request.json()
+      if (!body.sellerId || !body.name || Number(body.priceInr) <= 0) return ok({ error: 'sellerId, name and a positive price are required' }, 400)
+      const listing = {
+        id: uuidv4(), sellerId: body.sellerId, name: body.name.trim(), category: body.category || 'Other',
+        priceInr: Number(body.priceInr), stockUnits: Math.max(0, Number(body.stockUnits) || 0), status: 'active',
+        createdAt: new Date(), updatedAt: new Date(),
+      }
+      await db.collection('marketplace_listings').insertOne(listing)
+      return ok(listing, 201)
+    }
+
+    if (route === '/marketplace/orders' && method === 'GET') {
+      const sellerId = searchParams.get('sellerId')
+      const query = sellerId ? { sellerId } : {}
+      const orders = await db.collection('marketplace_orders').find(query).sort({ createdAt: -1 }).limit(200).toArray()
+      return ok(orders.map(({ _id, ...rest }) => rest))
+    }
+
+    if (route === '/marketplace/orders' && method === 'POST') {
+      const body = await request.json()
+      const quantity = Math.max(1, Number(body.quantity) || 1)
+      if (!body.sellerId || !body.listingId) return ok({ error: 'sellerId and listingId are required' }, 400)
+      const order = { id: uuidv4(), listingId: body.listingId, farmId: body.farmId || null, sellerId: body.sellerId, quantity, totalInr: Number(body.totalInr) || 0, status: 'new', createdAt: new Date(), updatedAt: new Date() }
+      await db.collection('marketplace_orders').insertOne(order)
+      return ok(order, 201)
+    }
+
+    if (route === '/marketplace/orders' && method === 'PATCH') {
+      const body = await request.json()
+      const order = await db.collection('marketplace_orders').findOne({ id: body.id })
+      if (!order) return ok({ error: 'Order not found' }, 404)
+      const nextStatus = body.status || 'packed'
+      if (!['new', 'packed', 'out_for_delivery', 'delivered'].includes(nextStatus)) return ok({ error: 'Invalid order status' }, 400)
+      order.status = nextStatus
+      order.updatedAt = new Date()
+      if (db.collection('marketplace_orders').updateOne) await db.collection('marketplace_orders').updateOne({ id: order.id }, { $set: order })
+      return ok(order)
+    }
+
+    if (route === '/admin/overview' && method === 'GET') {
+      const [farms, bookings, logs, metrics] = await Promise.all([
+        db.collection('farms').find({}).limit(1000).toArray(),
+        db.collection('bookings').find({}).limit(1000).toArray(),
+        db.collection('stress_diagnostic_logs').find({}).limit(1000).toArray(),
+        db.collection('district_metrics').find({}).limit(1000).toArray(),
+      ])
+      const districts = metrics.map((metric) => {
+        const districtFarms = farms.filter((farm) => farm.state === metric.state || farm.district === metric.district)
+        return { ...metric, farmers: districtFarms.length, coverage: districtFarms.length ? Math.min(100, Math.round((districtFarms.filter((farm) => farm.latitude && farm.longitude).length / districtFarms.length) * 100)) : 0 }
+      })
+      return ok({ farmers: farms.length, bookings: bookings.length, diagnostics: logs.length, districts })
+    }
+
+    if (route === '/admin/reviews' && method === 'GET') {
+      const reviews = await db.collection('admin_reviews').find({}).sort({ createdAt: -1 }).limit(200).toArray()
+      const farms = await db.collection('farms').find({}).limit(1000).toArray()
+      const reviewRows = reviews.length ? reviews : farms.map((farm) => ({ id: `farm-${farm.id}`, farmId: farm.id, reviewType: 'Farm verification', status: 'open', createdAt: farm.createdAt }))
+      return ok(reviewRows.map((review) => ({ ...review, farm: farms.find((farm) => farm.id === review.farmId) || null })))
+    }
+
+    if (route === '/admin/reviews' && method === 'PATCH') {
+      const body = await request.json()
+      const review = await db.collection('admin_reviews').findOne({ id: body.id })
+      if (!review && String(body.id || '').startsWith('farm-')) {
+        const farmId = String(body.id).slice(5)
+        const farm = await db.collection('farms').findOne({ id: farmId })
+        if (farm) {
+          const createdReview = { id: uuidv4(), farmId, reviewType: 'Farm verification', status: 'reviewed', createdAt: new Date(), reviewedAt: new Date() }
+          await db.collection('admin_reviews').insertOne(createdReview)
+          return ok(createdReview)
+        }
+      }
+      if (!review) return ok({ error: 'Review not found' }, 404)
+      review.status = body.status === 'reviewed' ? 'reviewed' : 'open'
+      review.reviewedAt = review.status === 'reviewed' ? new Date() : null
+      if (db.collection('admin_reviews').updateOne) await db.collection('admin_reviews').updateOne({ id: review.id }, { $set: review })
+      return ok(review)
     }
 
     if (route === '/stress' && method === 'GET') {
@@ -332,6 +426,7 @@ async function handleRoute(request, { params }) {
         diagnostic,
         sprayWindow: spray.windows,
         hydricStress: hydric.data,
+        syngentaApi: { sprayWindow: spray.ok, hydricStress: hydric.ok },
         location: { latitude: lat, longitude: lon },
       })
     }

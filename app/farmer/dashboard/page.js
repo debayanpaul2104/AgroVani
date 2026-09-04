@@ -59,7 +59,13 @@ export default function App() {
   const [listening, setListening] = useState(false)
   const [voiceMode, setVoiceMode] = useState('idle')
   const [cameraFile, setCameraFile] = useState(null)
+  const [cameraPreview, setCameraPreview] = useState('')
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraError, setCameraError] = useState('')
   const recognitionRef = useRef(null)
+  const cameraStreamRef = useRef(null)
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
   const { locale, t } = useLanguage()
   const copy = t.dashboard
 
@@ -71,6 +77,10 @@ export default function App() {
   }
 
   function startVoice() {
+    if (listening) {
+      stopVoice()
+      return
+    }
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!Recognition) {
       setVoiceText('Voice input is not supported in this browser.')
@@ -115,7 +125,52 @@ export default function App() {
     recognition.start()
   }
 
+  function stopCamera() {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop())
+    cameraStreamRef.current = null
+    setCameraOpen(false)
+  }
+
+  async function openCamera() {
+    setCameraError('')
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Camera access is not supported in this browser. Use Upload photo instead.')
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+      cameraStreamRef.current = stream
+      setCameraOpen(true)
+      if (videoRef.current) videoRef.current.srcObject = stream
+    } catch (error) {
+      setCameraError(error.name === 'NotAllowedError' ? 'Camera permission was denied. Enable it in browser settings or use Upload photo.' : 'Unable to start the camera. Use Upload photo instead.')
+    }
+  }
+
+  function captureCamera() {
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    if (!video || !canvas || !video.videoWidth) return
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
+    canvas.toBlob((blob) => {
+      if (blob) setCameraFile(new File([blob], `crop-${Date.now()}.jpg`, { type: 'image/jpeg' }))
+      stopCamera()
+    }, 'image/jpeg', 0.9)
+  }
+
   useEffect(() => () => stopVoice(), [])
+  useEffect(() => () => stopCamera(), [])
+  useEffect(() => {
+    if (!cameraFile) {
+      setCameraPreview('')
+      return undefined
+    }
+    const previewUrl = URL.createObjectURL(cameraFile)
+    setCameraPreview(previewUrl)
+    return () => URL.revokeObjectURL(previewUrl)
+  }, [cameraFile])
 
   useEffect(() => {
     const p = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
@@ -126,11 +181,6 @@ export default function App() {
       try {
         let res = await fetch('/api/farms')
         let list = await res.json()
-        if (!Array.isArray(list) || list.length === 0) {
-          await fetch('/api/seed', { method: 'POST' })
-          res = await fetch('/api/farms')
-          list = await res.json()
-        }
         const farmsArr = Array.isArray(list) ? list : []
         setFarms(farmsArr)
         const savedId = typeof window !== 'undefined' ? localStorage.getItem('fv_farmId') : null
@@ -160,6 +210,7 @@ export default function App() {
 
   const diag = stress?.diagnostic
   const sprayWindows = stress?.sprayWindow || []
+  const syngentaApi = stress?.syngentaApi
 
   return (
     <DebugBoundary>
@@ -280,6 +331,17 @@ export default function App() {
                       <h3 className="mt-4 text-2xl font-bold text-slate-900">{diag.product.product}</h3>
                       <p className="text-sm font-semibold text-emerald-700">{diag.product.brand}</p>
                       <p className="mt-3 text-sm leading-6 text-slate-600">{diag.product.rationale}</p>
+                      {diag.product.options?.length > 0 && (
+                        <div className="mt-5 space-y-2">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-500">Potential Syngenta options</p>
+                          {diag.product.options.map((option) => (
+                            <div key={option.name} className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2">
+                              <p className="text-sm font-semibold text-emerald-900">{option.name} <span className="font-normal text-emerald-700">· {option.type}</span></p>
+                              <p className="mt-1 text-xs leading-5 text-emerald-800">{option.use}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className="mt-5 rounded-2xl bg-slate-900 p-4 text-white">
                         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.28em] text-slate-300"><FlaskConical className="h-4 w-4" /> Smart pump-count dosing</div>
                         <p className="mt-3 text-sm text-slate-200">{diag.dosing.message}</p>
@@ -296,6 +358,7 @@ export default function App() {
                 <div className="glass-card card-3d">
                   <div className="flex items-center gap-2 text-slate-500"><Clock className="h-5 w-5" /><span className="text-[10px] font-bold uppercase tracking-[0.28em]">Optimal Spray Window</span></div>
                   <p className="mt-2 text-xs text-slate-400">Syngenta CE Hub</p>
+                  {syngentaApi && <p className="mt-1 text-xs text-slate-500">Live API: {syngentaApi.sprayWindow ? 'connected' : 'unavailable'} · Hydric stress: {syngentaApi.hydricStress ? 'connected' : 'unavailable'}</p>}
                   {sprayWindows.length > 0 ? (
                     <ul className="mt-4 space-y-2 text-sm text-emerald-800">
                       {sprayWindows.slice(0, 4).map((w, i) => (
@@ -316,15 +379,33 @@ export default function App() {
                   <div className="flex items-center gap-2 text-slate-900"><Mic className="h-5 w-5 text-emerald-600" /><h3 className="text-xl font-semibold">Voice Advisory</h3></div>
                   <p className="mt-2 text-sm text-slate-600">Ask in Punjabi, Hindi, Marathi, Tamil or Telugu. Speech-to-Text advisory.</p>
                   <button onClick={startVoice} aria-label={listening ? 'Stop voice advisory' : 'Start voice advisory'} aria-pressed={listening} className={`mt-5 flex h-14 w-14 items-center justify-center rounded-full shadow-sm ${listening ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}><Mic className="h-6 w-6" /></button>
-                  <p className="mt-3 text-xs text-slate-500">{voiceText || (voiceMode === 'connecting' ? 'Connecting...' : listening ? 'Listening...' : 'Tap the microphone and ask your question.')}</p>
+                  <p className="mt-3 text-xs text-slate-500">{voiceText || (voiceMode === 'thinking' ? 'Thinking...' : listening ? 'Listening... Tap again to stop.' : 'Tap the microphone and ask your question.')}</p>
                   {voiceReply && <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{voiceReply}</p>}
                 </div>
 
                 <div className="glass-card">
                   <div className="flex items-center gap-2 text-slate-900"><Camera className="h-5 w-5 text-emerald-600" /><h3 className="text-xl font-semibold">Crop Cam Diagnostic</h3></div>
                   <p className="mt-2 text-sm text-slate-600">Snap a leaf to detect chlorosis, heat wilting & fungal lesions with Gemini Vision.</p>
-                  <label className="mt-5 flex h-24 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-200 bg-white/50 text-sm font-medium text-slate-500 hover:bg-white/80">{cameraFile ? <img src={URL.createObjectURL(cameraFile)} alt="Captured crop leaf" className="h-full w-full object-cover" /> : 'Upload leaf image'}<input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(event) => setCameraFile(event.target.files?.[0] || null)} /></label>
-                  <p className="mt-3 text-xs text-slate-500">{cameraFile ? 'Leaf image ready for diagnosis.' : 'Choose a leaf photo to prepare a crop diagnosis.'}</p>
+                  {cameraOpen ? (
+                    <div className="mt-5 overflow-hidden rounded-2xl border border-emerald-200 bg-slate-950">
+                      <video ref={videoRef} autoPlay playsInline muted className="h-48 w-full object-cover" />
+                      <div className="flex gap-3 p-3">
+                        <button type="button" onClick={captureCamera} className="pill-dark flex-1">Capture photo</button>
+                        <button type="button" onClick={stopCamera} className="glass-btn flex-1 border-white/20 bg-white/10 text-white hover:bg-white/20">Cancel</button>
+                      </div>
+                    </div>
+                  ) : cameraPreview ? (
+                    <img src={cameraPreview} alt="Captured crop leaf" className="mt-5 h-48 w-full rounded-2xl object-cover" />
+                  ) : (
+                    <div className="mt-5 flex h-24 items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/50 text-sm font-medium text-slate-500">No crop photo selected</div>
+                  )}
+                  <canvas ref={canvasRef} className="hidden" />
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button type="button" onClick={openCamera} className="pill-dark"><Camera className="mr-2 h-4 w-4" /> Open camera</button>
+                    <label className="glass-btn cursor-pointer"><span>Upload photo</span><input type="file" accept="image/*" className="sr-only" onChange={(event) => setCameraFile(event.target.files?.[0] || null)} /></label>
+                  </div>
+                  {cameraError && <p role="alert" className="mt-3 text-xs font-medium text-red-600">{cameraError}</p>}
+                  <p className="mt-3 text-xs text-slate-500">{cameraFile ? 'Leaf image ready for diagnosis.' : 'Use the camera or upload a leaf photo to prepare a crop diagnosis.'}</p>
                 </div>
               </div>
 

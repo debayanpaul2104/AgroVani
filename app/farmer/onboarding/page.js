@@ -11,12 +11,11 @@ import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 const CROPS = ['Rice', 'Wheat', 'Corn', 'Cotton', 'Soybean']
-const DISTRICTS = ['Patiala', 'Ludhiana', 'Indore', 'Nagpur', 'Guntur']
 
 const EMPTY = {
-  name: '', village: '', district: 'Patiala', state: 'Punjab',
+  name: '', village: '', district: '', state: '',
   cropType: 'Rice', areaInAcres: 5, soilPh: 6.5, nitrogenKgPerHa: 100,
-  latitude: 30.3398, longitude: 76.3869, locale: 'en',
+  latitude: 20.5937, longitude: 78.9629, locale: 'en',
 }
 
 export default function App() {
@@ -137,14 +136,14 @@ export default function App() {
                   <p className="text-xs text-slate-500">{copy.locatedAt} {Number(form.latitude).toFixed(3)}, {Number(form.longitude).toFixed(3)}</p>
                 </div>
 
-                <div className="space-y-3">
-                  <Label className="text-sm font-semibold text-slate-700">{copy.district}</Label>
-                  <div className="flex flex-wrap gap-3">
-                    {DISTRICTS.map((d) => (
-                      <button key={d} type="button" onClick={() => set('district', d)} className={`rounded-full px-5 py-2.5 text-sm font-medium transition ${form.district === d ? 'bg-slate-900 text-white shadow-md' : 'border border-white/80 bg-white/60 text-slate-700 hover:bg-white/80'}`}>
-                        {d}
-                      </button>
-                    ))}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold text-slate-700">{copy.district}</Label>
+                    <Input value={form.district} onChange={(e) => set('district', e.target.value)} placeholder="e.g. Nashik" className="h-12 rounded-xl border border-white/70 bg-white/60 px-4 text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold text-slate-700">State / UT</Label>
+                    <Input value={form.state} onChange={(e) => set('state', e.target.value)} placeholder="e.g. Maharashtra" className="h-12 rounded-xl border border-white/70 bg-white/60 px-4 text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10" />
                   </div>
                 </div>
               </div>
